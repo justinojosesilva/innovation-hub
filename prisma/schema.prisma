@@ -1,0 +1,298 @@
+// Innovation Hub — schema
+// Slice 1: importer + ranking. Semantic dedup (pgvector embedding) lands in slice 2
+// as an additive migration; the Postgres image already ships pgvector.
+
+generator client {
+  provider     = "prisma-client" // Prisma 7: new Rust-free client
+  output       = "../src/generated/prisma"
+  moduleFormat = "cjs"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum IdeaStatus {
+  NOVA
+  EM_AVALIACAO
+  EM_VALIDACAO
+  MVP
+  PRODUCAO
+  DESCARTADA
+}
+
+enum Complexity {
+  BAIXA
+  MEDIA
+  ALTA
+}
+
+// Module: personal gut-reaction signal, separate from the computed score.
+enum Reaction {
+  LIKED
+  DISLIKED
+}
+
+// One imported Daily Tech Scout report (.md file).
+model Report {
+  id         String   @id @default(cuid())
+  sourceDate DateTime // the day the report covers
+  title      String?
+  filePath   String
+  fileHash   String   @unique // sha256 of contents -> idempotent re-import
+  rawMd      String
+  importedAt DateTime @default(now())
+  ideas      Idea[]
+}
+
+// A single business idea extracted from a report.
+model Idea {
+  id               String      @id @default(cuid())
+  title            String
+  slug             String
+  category         String?
+  source           String?
+  sourceUrl        String?
+  description      String? // "O que é"
+  whyItMatters     String? // "Por que importa"
+  howToImplement   String? // "Como implementar"
+  monetization     String? // "Monetização" / "Potencial de Monetização"
+  // Rich fields specific to the "Top Oportunidade do Dia" section:
+  problem          String? // "Problema"
+  solution         String? // "Solução"
+  audience         String? // "Público-alvo"
+  mvp              String? // "MVP em N dias"
+  stack            String? // "Stack sugerida"
+  complexity       Complexity?
+  reaction         Reaction?
+  maturityChecks   String[]    @default([]) // completed maturation criteria keys
+  isTopOpportunity Boolean     @default(false)
+  status           IdeaStatus  @default(NOVA)
+  discoveredAt     DateTime
+  rawSection       String // original markdown of this idea's block
+  reportId         String
+  report           Report      @relation(fields: [reportId], references: [id], onDelete: Cascade)
+  score            IdeaScore?
+  notes            IdeaNote[]
+  features         Feature[]
+  xpEvents         XpEvent[]
+  dupA             DuplicatePair[] @relation("DupA")
+  dupB             DuplicatePair[] @relation("DupB")
+  docs             GeneratedDoc[]
+  fits             ProjectFit[]
+  createdAt        DateTime    @default(now())
+  updatedAt        DateTime    @updatedAt
+
+  @@unique([reportId, slug])
+  @@index([status])
+}
+
+// Module 7: semantic dedup. Pairs are judged by an LLM (Claude Haiku) — each
+// pair stored once with the lower idea id as A. Re-running the analysis upserts.
+model DuplicatePair {
+  id             String   @id @default(cuid())
+  ideaAId        String
+  ideaBId        String
+  ideaA          Idea     @relation("DupA", fields: [ideaAId], references: [id], onDelete: Cascade)
+  ideaB          Idea     @relation("DupB", fields: [ideaBId], references: [id], onDelete: Cascade)
+  similarity     Int // 0..100
+  rationale      String
+  recommendation String // MERGE | RELATED | DISTINCT
+  status         String   @default("open") // open | dismissed | merged
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@unique([ideaAId, ideaBId])
+  @@index([status])
+}
+
+enum FeatureStatus {
+  BACKLOG
+  DOING
+  DONE
+}
+
+// A proposed functionality. Belongs to an Idea (captured from merges/PRD) OR to
+// a Project (its backlog). Feeds PRD/SDD.
+model Feature {
+  id          String        @id @default(cuid())
+  ideaId      String?
+  idea        Idea?         @relation(fields: [ideaId], references: [id], onDelete: Cascade)
+  projectId   String?
+  project     Project?      @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  title       String
+  description String?
+  source      String? // e.g. provenance when captured from a merge
+  status      FeatureStatus @default(BACKLOG)
+  priority    Int           @default(0)
+  createdAt   DateTime      @default(now())
+
+  @@index([ideaId])
+  @@index([projectId])
+}
+
+enum ProjectStatus {
+  DISCOVERY
+  BUILDING
+  LIVE
+  PAUSED
+  ARCHIVED
+}
+
+// Module 12: a user's own project (e.g. finflow) — a tracked workspace.
+model Project {
+  id           String          @id // slug, e.g. "finflow"
+  name         String
+  context      String // description used as context for the AI fit assessment
+  status       ProjectStatus   @default(DISCOVERY)
+  sourceIdeaId String? // set when promoted from a matured idea
+  createdAt    DateTime        @default(now())
+  updatedAt    DateTime        @updatedAt
+  fits         ProjectFit[]
+  features     Feature[]
+  updates      ProjectUpdate[]
+  metrics      Metric[]
+  milestones   Milestone[]
+}
+
+// Project roadmap — a target with an optional due date.
+model Milestone {
+  id        String    @id @default(cuid())
+  projectId String
+  project   Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  title     String
+  dueDate   DateTime?
+  done      Boolean   @default(false)
+  createdAt DateTime  @default(now())
+
+  @@index([projectId])
+}
+
+// Project journal — dated updates (decisions, progress, blockers).
+model ProjectUpdate {
+  id        String   @id @default(cuid())
+  projectId String
+  project   Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  kind      String   @default("progresso") // progresso | decisao | bloqueio | marco
+  body      String
+  createdAt DateTime @default(now())
+
+  @@index([projectId])
+}
+
+// A project KPI (definition) and its recorded values over time.
+model Metric {
+  id        String        @id @default(cuid())
+  projectId String
+  project   Project       @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  name      String
+  unit      String?
+  createdAt DateTime      @default(now())
+  points    MetricPoint[]
+
+  @@index([projectId])
+}
+
+model MetricPoint {
+  id        String   @id @default(cuid())
+  metricId  String
+  metric    Metric   @relation(fields: [metricId], references: [id], onDelete: Cascade)
+  value     Float
+  date      DateTime
+  createdAt DateTime @default(now())
+
+  @@index([metricId])
+}
+
+// Module 12: how applicable an idea is as a feature of a given project.
+// Only applicable ideas are stored (re-eval replaces the project's fits).
+model ProjectFit {
+  id          String   @id @default(cuid())
+  ideaId      String
+  idea        Idea     @relation(fields: [ideaId], references: [id], onDelete: Cascade)
+  projectId   String
+  project     Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  impact      String // ALTO | MEDIO | BAIXO
+  roi         String // ALTO | MEDIO | BAIXO
+  effortWeeks Int
+  rationale   String
+  createdAt   DateTime @default(now())
+
+  @@unique([ideaId, projectId])
+  @@index([projectId])
+}
+
+// Modules 8 & 9: AI-generated artifacts per idea.
+// CANVAS content is JSON (9 BMC blocks); PRD content is markdown.
+model GeneratedDoc {
+  id        String   @id @default(cuid())
+  ideaId    String
+  idea      Idea     @relation(fields: [ideaId], references: [id], onDelete: Cascade)
+  type      String // CANVAS | PRD
+  content   String
+  model     String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([ideaId, type])
+}
+
+// Module 11: gamification. Event-sourced XP — each milestone is granted once
+// per idea (the @@unique below makes re-awarding idempotent, so moving a status
+// back and forth never double-counts). Total XP = sum(xp).
+model XpEvent {
+  id        String   @id @default(cuid())
+  type      String // IDEA_CREATED | IDEA_VALIDATED | IDEA_MVP | IDEA_LAUNCHED | MILESTONE_DONE | FEATURE_DONE
+  xp        Int
+  ideaId    String?
+  idea      Idea?    @relation(fields: [ideaId], references: [id], onDelete: Cascade)
+  key       String?  @unique // stable per-entity key (e.g. "milestone:<id>") to dedupe project events
+  createdAt DateTime @default(now())
+
+  @@unique([ideaId, type])
+  @@index([type])
+}
+
+// The five criteria + the score printed in the report.
+// Final score is computed in-app from ScoreWeights so weight changes re-rank live.
+model IdeaScore {
+  id            String   @id @default(cuid())
+  ideaId        String   @unique
+  idea          Idea     @relation(fields: [ideaId], references: [id], onDelete: Cascade)
+  monetizacao   Int? // 0..10
+  implementacao Int?
+  stackFit      Int?
+  tendencia     Int?
+  diferencial   Int?
+  reportScore   Decimal? @db.Decimal(4, 2) // score as printed in the report
+}
+
+// Module 3 groundwork: "CRM of ideas" — observations, competitors, links, feedback.
+model IdeaNote {
+  id        String   @id @default(cuid())
+  ideaId    String
+  idea      Idea     @relation(fields: [ideaId], references: [id], onDelete: Cascade)
+  kind      String   @default("observacao") // observacao | problema | concorrente | feedback | link
+  body      String
+  createdAt DateTime @default(now())
+
+  @@index([ideaId])
+}
+
+// App settings singleton (id = 1). Currently: which model the AI features use.
+model Settings {
+  id        Int      @id @default(1)
+  genModel  String   @default("claude-opus-4-8")
+  updatedAt DateTime @updatedAt
+}
+
+// Module 4: editable weights for the scoring formula. Single row (id = 1).
+model ScoreWeights {
+  id            Int      @id @default(1)
+  monetizacao   Float    @default(0.30)
+  implementacao Float    @default(0.20)
+  stackFit      Float    @default(0.20)
+  tendencia     Float    @default(0.20)
+  diferencial   Float    @default(0.10)
+  updatedAt     DateTime @updatedAt
+}

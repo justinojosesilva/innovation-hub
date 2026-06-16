@@ -1,0 +1,32 @@
+services:
+  db:
+    image: pgvector/pgvector:pg16
+    container_name: innovation-hub-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: hub
+      POSTGRES_PASSWORD: hub
+      POSTGRES_DB: innovation_hub
+    ports:
+      - "5433:5432"
+    volumes:
+      - ih_pgdata:/var/lib/postgresql/data
+
+  # The Next.js app. Build with: docker compose --profile app up --build
+  # (the db alone still comes up with `pnpm db:up`). Inside the compose network
+  # Postgres is reachable at db:5432.
+  app:
+    build: .
+    profiles: ["app"]
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: "postgresql://hub:hub@db:5432/innovation_hub?schema=public"
+      ANTHROPIC_API_KEY: "${ANTHROPIC_API_KEY:-}"
+      REPORTS_DIR: "/app/reports"
+    ports:
+      - "3000:3000"
+    depends_on:
+      - db
+
+volumes:
+  ih_pgdata:
