@@ -10,9 +10,22 @@ function refresh() {
   revalidatePath("/");
 }
 
-export async function runAnalysis() {
-  await analyzeDuplicates();
-  refresh();
+export type AnalyzeState =
+  | { ok: true; pairsFound: number; analyzed: number }
+  | { ok: false; error: string }
+  | null;
+
+export async function runAnalysis(
+  _prev: AnalyzeState,
+  _formData: FormData
+): Promise<AnalyzeState> {
+  try {
+    const r = await analyzeDuplicates();
+    refresh();
+    return { ok: true, pairsFound: r.pairsFound, analyzed: r.analyzed };
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : "Falha ao analisar" };
+  }
 }
 
 export async function dismissPair(formData: FormData) {

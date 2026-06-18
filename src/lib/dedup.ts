@@ -60,6 +60,7 @@ export async function analyzeDuplicates(): Promise<DedupResult> {
   }
 
   const ideas = await prisma.idea.findMany({
+    where: { status: { not: "DESCARTADA" } }, // descartadas não entram no dedup
     orderBy: { createdAt: "asc" },
     select: { id: true, title: true, category: true, description: true, problem: true },
   });
@@ -74,19 +75,33 @@ export async function analyzeDuplicates(): Promise<DedupResult> {
     })
     .join("\n\n");
 
+  // Streaming + generous budget: the pairs JSON grows with the catalog, and a
+  // truncated structured response is invalid JSON. Stream to avoid timeouts.
   const client = new Anthropic();
-  const response = await client.messages.create({
+  const stream = client.messages.stream({
     model: await getGenModel(),
-    max_tokens: 4096,
+    max_tokens: 16000,
     system: SYSTEM,
     messages: [{ role: "user", content: `Catálogo (${ideas.length} ideias):\n\n${catalog}` }],
     output_config: { format: { type: "json_schema", schema: SCHEMA } },
   });
+  const response = await stream.finalMessage();
+
+  if (response.stop_reason === "max_tokens") {
+    throw new Error(
+      "Catálogo grande demais para uma análise só (resposta truncada). Descarte ideias antigas ou rode em lotes."
+    );
+  }
 
   const text = response.content.find((b) => b.type === "text");
   if (!text || text.type !== "text") return { analyzed: ideas.length, pairsFound: 0 };
 
-  const parsed = JSON.parse(text.text) as { pairs: LlmPair[] };
+  let parsed: { pairs: LlmPair[] };
+  try {
+    parsed = JSON.parse(text.text) as { pairs: LlmPair[] };
+  } catch {
+    throw new Error("Não consegui interpretar a resposta da IA (JSON inválido). Tente novamente.");
+  }
   const pairs = (parsed.pairs ?? []).filter(
     (p) =>
       p.similarity >= MIN_SIMILARITY &&

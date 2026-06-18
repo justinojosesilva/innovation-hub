@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { getDuplicatePairs } from "@/lib/dedup";
-import { runAnalysis, mergePair, dismissPair } from "./actions";
-import { SubmitButton } from "@/app/_components/submit-button";
+import { mergePair, dismissPair } from "./actions";
+import { AnalyzeForm } from "./analyze-form";
 
 export const dynamic = "force-dynamic";
 
@@ -37,7 +37,7 @@ export default async function DuplicatesPage() {
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">Detecção de Duplicatas</h1>
           <p className="mt-1 text-sm text-neutral-500">
-            Ideias semanticamente parecidas, avaliadas por IA (Claude Haiku).
+            Ideias semanticamente parecidas, avaliadas por IA (Claude).
           </p>
         </div>
         <Link href="/" className="text-sm text-neutral-500 underline-offset-4 hover:underline">
@@ -45,20 +45,7 @@ export default async function DuplicatesPage() {
         </Link>
       </header>
 
-      <form action={runAnalysis} className="mb-8">
-        <SubmitButton
-          disabled={!hasKey}
-          pendingText="Analisando…"
-          className="rounded-lg bg-indigo-600 px-5 py-2.5 text-sm font-medium text-white transition-colors hover:bg-indigo-500"
-        >
-          {pairs.length === 0 ? "Analisar duplicatas" : "Reanalisar"}
-        </SubmitButton>
-        {!hasKey && (
-          <p className="mt-2 text-xs text-rose-500">
-            Configure ANTHROPIC_API_KEY no .env para rodar a análise.
-          </p>
-        )}
-      </form>
+      <AnalyzeForm hasKey={hasKey} hasPairs={pairs.length > 0} />
 
       {open.length === 0 && resolved.length === 0 ? (
         <div className="rounded-xl border border-dashed border-neutral-300 px-6 py-16 text-center dark:border-neutral-700">
