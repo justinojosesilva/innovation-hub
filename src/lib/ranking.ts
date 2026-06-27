@@ -83,7 +83,7 @@ export async function getRankedIdeas(
         isTopOpportunity: idea.isTopOpportunity,
         complexity: idea.complexity as string | null,
         reaction: idea.reaction as string | null,
-        sourceDate: idea.report.sourceDate,
+        sourceDate: idea.report?.sourceDate ?? idea.discoveredAt,
         reportScore,
         finalScore,
       };

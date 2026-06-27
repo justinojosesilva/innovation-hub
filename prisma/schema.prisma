@@ -70,8 +70,8 @@ model Idea {
   status           IdeaStatus  @default(NOVA)
   discoveredAt     DateTime
   rawSection       String // original markdown of this idea's block
-  reportId         String
-  report           Report      @relation(fields: [reportId], references: [id], onDelete: Cascade)
+  reportId         String? // null for synthesized / manually-created ideas
+  report           Report?     @relation(fields: [reportId], references: [id], onDelete: Cascade)
   score            IdeaScore?
   notes            IdeaNote[]
   features         Feature[]
@@ -80,11 +80,31 @@ model Idea {
   dupB             DuplicatePair[] @relation("DupB")
   docs             GeneratedDoc[]
   fits             ProjectFit[]
+  clusters         IdeaCluster[]   @relation("ClusterIdeas")
   createdAt        DateTime    @default(now())
   updatedAt        DateTime    @updatedAt
 
   @@unique([reportId, slug])
   @@index([status])
+}
+
+// Thematic cluster of ideas + a synthesized unified-system concept (Sínteses).
+model IdeaCluster {
+  id        String   @id @default(cuid())
+  theme     String
+  rationale String
+  ideas     Idea[]   @relation("ClusterIdeas")
+
+  // Synthesis (filled on demand):
+  synthName         String?
+  synthValueProp    String?
+  synthDifferential String?
+  synthMvp          String?
+  synthFeatures     String[]  @default([])
+  synthScores       Json?
+  synthesizedAt     DateTime?
+  savedIdeaId       String? // the Idea created from this synthesis, if any
+  createdAt         DateTime  @default(now())
 }
 
 // Module 7: semantic dedup. Pairs are judged by an LLM (Claude Haiku) — each

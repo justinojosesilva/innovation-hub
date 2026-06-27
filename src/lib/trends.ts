@@ -41,6 +41,7 @@ export async function getTrends(): Promise<TrendsData> {
       select: {
         category: true,
         reportId: true,
+        discoveredAt: true,
         report: { select: { sourceDate: true } },
         score: { select: { reportScore: true } },
       },
@@ -59,9 +60,10 @@ export async function getTrends(): Promise<TrendsData> {
     if (themes.length === 0) continue;
     themedIdeaCount++;
 
-    const dateKey = idea.report.sourceDate.toISOString().slice(0, 10);
+    const sd = idea.report?.sourceDate ?? idea.discoveredAt;
+    const dateKey = sd.toISOString().slice(0, 10);
     if (!byDate.has(dateKey)) {
-      byDate.set(dateKey, { sourceDate: idea.report.sourceDate, counts: new Map() });
+      byDate.set(dateKey, { sourceDate: sd, counts: new Map() });
     }
     const dateBucket = byDate.get(dateKey)!.counts;
     const score = idea.score?.reportScore ? Number(idea.score.reportScore) : null;
@@ -70,7 +72,7 @@ export async function getTrends(): Promise<TrendsData> {
       ideaCount.set(theme, (ideaCount.get(theme) ?? 0) + 1);
 
       if (!reportSets.has(theme)) reportSets.set(theme, new Set());
-      reportSets.get(theme)!.add(idea.reportId);
+      if (idea.reportId) reportSets.get(theme)!.add(idea.reportId);
 
       dateBucket.set(theme, (dateBucket.get(theme) ?? 0) + 1);
 

@@ -6,6 +6,7 @@ import {
   GitMerge,
   Award,
   Briefcase,
+  Combine,
   type LucideIcon,
 } from "lucide-react";
 
@@ -29,6 +30,7 @@ export const NAV_GROUPS: NavGroup[] = [
     label: "Inteligência",
     items: [
       { href: "/duplicates", label: "Duplicatas", icon: GitMerge },
+      { href: "/sintese", label: "Sínteses", icon: Combine },
       { href: "/conquistas", label: "Conquistas", icon: Award },
     ],
   },

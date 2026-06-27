@@ -254,7 +254,7 @@ export default async function IdeaDetailPage({
           <h1 className="text-2xl font-semibold tracking-tight">{idea.title}</h1>
           <p className="mt-1 text-sm text-neutral-400">
             Descoberta em{" "}
-            {new Date(idea.report.sourceDate).toLocaleDateString("pt-BR", {
+            {new Date(idea.report?.sourceDate ?? idea.discoveredAt).toLocaleDateString("pt-BR", {
               timeZone: "UTC",
             })}
             {idea.sourceUrl && (
