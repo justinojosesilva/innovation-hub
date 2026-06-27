@@ -1,13 +1,14 @@
 import Link from "next/link";
-import { Sparkles, ArrowRight, CheckCircle2 } from "lucide-react";
-import { getClusters } from "@/lib/synthesis";
+import { Sparkles, ArrowRight, CheckCircle2, Hand } from "lucide-react";
+import { getClusters, getPickableIdeas } from "@/lib/synthesis";
 import { ClusterForm } from "./cluster-form";
+import { CreateClusterForm } from "./create-cluster-form";
 
 export const dynamic = "force-dynamic";
 const hasKey = !!process.env.ANTHROPIC_API_KEY;
 
 export default async function SintesePage() {
-  const clusters = await getClusters();
+  const [clusters, pickable] = await Promise.all([getClusters(), getPickableIdeas()]);
 
   return (
     <main className="mx-auto max-w-4xl px-6 py-10">
@@ -24,6 +25,8 @@ export default async function SintesePage() {
       </header>
 
       <ClusterForm hasKey={hasKey} hasClusters={clusters.length > 0} />
+
+      <CreateClusterForm ideas={pickable} />
 
       {clusters.length === 0 ? (
         <div className="rounded-xl border border-dashed border-neutral-300 px-6 py-16 text-center dark:border-neutral-700">
@@ -43,7 +46,8 @@ export default async function SintesePage() {
               className="group flex h-full flex-col gap-2 rounded-xl border border-neutral-200 bg-white p-4 transition-all hover:-translate-y-0.5 hover:border-indigo-300 hover:shadow-md motion-reduce:hover:translate-y-0 dark:border-neutral-800 dark:bg-neutral-900 dark:hover:border-indigo-700"
             >
               <div className="flex items-start justify-between gap-2">
-                <span className="font-medium group-hover:text-indigo-600 dark:group-hover:text-indigo-400">
+                <span className="flex items-center gap-1.5 font-medium group-hover:text-indigo-600 dark:group-hover:text-indigo-400">
+                  {c.manual && <Hand className="h-3.5 w-3.5 shrink-0 text-amber-500" />}
                   {c.theme}
                 </span>
                 {c.savedIdeaId ? (

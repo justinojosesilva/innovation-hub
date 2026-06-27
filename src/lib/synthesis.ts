@@ -84,8 +84,8 @@ Para cada cluster retorne: theme (nome curto do grupo), rationale (1 frase do po
     }))
     .filter((c) => c.ideaIds.length >= 2);
 
-  // Re-clustering replaces the existing groups (saved ideas persist independently).
-  await prisma.ideaCluster.deleteMany({});
+  // Re-clustering replaces the AI groups; hand-curated ones (manual) survive.
+  await prisma.ideaCluster.deleteMany({ where: { manual: false } });
   for (const c of valid) {
     await prisma.ideaCluster.create({
       data: {
@@ -238,6 +238,50 @@ export async function saveClusterAsIdea(clusterId: string): Promise<string | nul
     data: { savedIdeaId: idea.id },
   });
   return idea.id;
+}
+
+// ---------------------------------------------------------------- manual edits
+// Active ideas usable as cluster members (id + title), for the pickers.
+export async function getPickableIdeas() {
+  return prisma.idea.findMany({
+    where: { status: { not: "DESCARTADA" } },
+    orderBy: { title: "asc" },
+    select: { id: true, title: true, category: true },
+  });
+}
+
+export async function createManualCluster(theme: string, ideaIds: string[]) {
+  const cleanIds = [...new Set(ideaIds)].filter(Boolean);
+  const cluster = await prisma.ideaCluster.create({
+    data: {
+      theme: theme.trim(),
+      rationale: "Grupo montado manualmente.",
+      manual: true,
+      ideas: { connect: cleanIds.map((id) => ({ id })) },
+    },
+  });
+  return cluster.id;
+}
+
+// Adding/removing members marks the cluster manual so it survives re-clustering.
+export async function addIdeasToCluster(clusterId: string, ideaIds: string[]) {
+  const cleanIds = [...new Set(ideaIds)].filter(Boolean);
+  if (cleanIds.length === 0) return;
+  await prisma.ideaCluster.update({
+    where: { id: clusterId },
+    data: { manual: true, ideas: { connect: cleanIds.map((id) => ({ id })) } },
+  });
+}
+
+export async function removeIdeaFromCluster(clusterId: string, ideaId: string) {
+  await prisma.ideaCluster.update({
+    where: { id: clusterId },
+    data: { manual: true, ideas: { disconnect: { id: ideaId } } },
+  });
+}
+
+export async function deleteCluster(clusterId: string) {
+  await prisma.ideaCluster.delete({ where: { id: clusterId } });
 }
 
 // ---------------------------------------------------------------- reads

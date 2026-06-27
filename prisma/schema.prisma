@@ -93,6 +93,7 @@ model IdeaCluster {
   id        String   @id @default(cuid())
   theme     String
   rationale String
+  manual    Boolean  @default(false) // curated/created by hand → survives AI re-clustering
   ideas     Idea[]   @relation("ClusterIdeas")
 
   // Synthesis (filled on demand):

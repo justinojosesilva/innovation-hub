@@ -1,9 +1,15 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { Sparkles, CheckCircle2, ExternalLink } from "lucide-react";
-import { getCluster } from "@/lib/synthesis";
+import { Sparkles, CheckCircle2, ExternalLink, Hand, X, Trash2 } from "lucide-react";
+import { getCluster, getPickableIdeas } from "@/lib/synthesis";
 import { SubmitButton } from "@/app/_components/submit-button";
-import { synthesizeClusterAction, saveAsIdeaAction } from "../actions";
+import {
+  synthesizeClusterAction,
+  saveAsIdeaAction,
+  removeIdeaAction,
+  deleteClusterAction,
+} from "../actions";
+import { AddIdeasForm } from "../add-ideas-form";
 
 export const dynamic = "force-dynamic";
 const hasKey = !!process.env.ANTHROPIC_API_KEY;
@@ -22,11 +28,13 @@ export default async function ClusterPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-  const cluster = await getCluster(id);
+  const [cluster, pickable] = await Promise.all([getCluster(id), getPickableIdeas()]);
   if (!cluster) notFound();
 
   const synthesized = !!cluster.synthesizedAt;
   const scores = (cluster.synthScores ?? {}) as Record<string, number | null>;
+  const memberIds = new Set(cluster.ideas.map((i) => i.id));
+  const available = pickable.filter((i) => !memberIds.has(i.id));
 
   return (
     <main className="mx-auto max-w-3xl px-6 py-10">
@@ -35,7 +43,14 @@ export default async function ClusterPage({
       </Link>
 
       <header className="mt-3 mb-6">
-        <h1 className="text-2xl font-semibold tracking-tight">{cluster.theme}</h1>
+        <div className="flex flex-wrap items-center gap-2">
+          <h1 className="text-2xl font-semibold tracking-tight">{cluster.theme}</h1>
+          {cluster.manual && (
+            <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-medium text-amber-700 dark:bg-amber-950 dark:text-amber-300">
+              <Hand className="h-3 w-3" /> curado à mão
+            </span>
+          )}
+        </div>
         <p className="mt-1 text-sm text-neutral-500">{cluster.rationale}</p>
       </header>
 
@@ -46,15 +61,34 @@ export default async function ClusterPage({
         </h2>
         <div className="flex flex-wrap gap-2">
           {cluster.ideas.map((i) => (
-            <Link
+            <span
               key={i.id}
-              href={`/ideas/${i.id}`}
-              className="rounded-full border border-neutral-200 px-3 py-1 text-sm text-neutral-600 underline-offset-4 hover:border-indigo-300 hover:text-indigo-600 dark:border-neutral-700 dark:text-neutral-300"
+              className="inline-flex items-center gap-1 rounded-full border border-neutral-200 py-1 pl-3 pr-1 text-sm dark:border-neutral-700"
             >
-              {i.title}
-            </Link>
+              <Link
+                href={`/ideas/${i.id}`}
+                className="text-neutral-600 underline-offset-4 hover:text-indigo-600 dark:text-neutral-300"
+              >
+                {i.title}
+              </Link>
+              <form action={removeIdeaAction}>
+                <input type="hidden" name="clusterId" value={cluster.id} />
+                <input type="hidden" name="ideaId" value={i.id} />
+                <button
+                  type="submit"
+                  aria-label={`Remover ${i.title} do grupo`}
+                  className="rounded-full p-0.5 text-neutral-400 transition-colors hover:bg-rose-50 hover:text-rose-500 dark:hover:bg-rose-950/40"
+                >
+                  <X className="h-3.5 w-3.5" />
+                </button>
+              </form>
+            </span>
           ))}
+          {cluster.ideas.length === 0 && (
+            <p className="text-sm text-neutral-400">Grupo vazio — adicione ideias abaixo.</p>
+          )}
         </div>
+        <AddIdeasForm clusterId={cluster.id} available={available} />
       </section>
 
       {/* synthesis */}
@@ -65,7 +99,7 @@ export default async function ClusterPage({
           <form action={synthesizeClusterAction} className="mt-4">
             <input type="hidden" name="clusterId" value={cluster.id} />
             <SubmitButton
-              disabled={!hasKey}
+              disabled={!hasKey || cluster.ideas.length < 2}
               pendingText="Sintetizando…"
               className="rounded-lg bg-indigo-600 px-5 py-2.5 text-sm font-medium text-white transition-colors hover:bg-indigo-500"
             >
@@ -165,6 +199,16 @@ export default async function ClusterPage({
           </div>
         </section>
       )}
+
+      <form action={deleteClusterAction} className="mt-8">
+        <input type="hidden" name="clusterId" value={cluster.id} />
+        <SubmitButton
+          pendingText="Excluindo…"
+          className="inline-flex items-center gap-1.5 text-xs text-neutral-400 underline-offset-4 hover:text-rose-500 hover:underline"
+        >
+          <Trash2 className="h-3.5 w-3.5" /> Excluir grupo
+        </SubmitButton>
+      </form>
     </main>
   );
 }
