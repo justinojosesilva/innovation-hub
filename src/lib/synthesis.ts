@@ -232,6 +232,21 @@ export async function saveClusterAsIdea(clusterId: string): Promise<string | nul
     },
   });
 
+  // Carry any Canvas/PRD generated on the synthesis over to the new idea.
+  const docs = await prisma.generatedDoc.findMany({
+    where: { clusterId, type: { in: ["CANVAS", "PRD"] } },
+  });
+  if (docs.length > 0) {
+    await prisma.generatedDoc.createMany({
+      data: docs.map((d) => ({
+        ideaId: idea.id,
+        type: d.type,
+        content: d.content,
+        model: d.model,
+      })),
+    });
+  }
+
   await awardIdeaCreated(idea.id);
   await prisma.ideaCluster.update({
     where: { id: clusterId },

@@ -1,13 +1,16 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { Sparkles, CheckCircle2, ExternalLink, Hand, X, Trash2 } from "lucide-react";
+import { Sparkles, CheckCircle2, ExternalLink, Hand, X, Trash2, LayoutGrid, FileText, type LucideIcon } from "lucide-react";
 import { getCluster, getPickableIdeas } from "@/lib/synthesis";
+import { getClusterDoc } from "@/lib/generate";
 import { SubmitButton } from "@/app/_components/submit-button";
 import {
   synthesizeClusterAction,
   saveAsIdeaAction,
   removeIdeaAction,
   deleteClusterAction,
+  generateClusterCanvasAction,
+  generateClusterPrdAction,
 } from "../actions";
 import { AddIdeasForm } from "../add-ideas-form";
 
@@ -35,6 +38,12 @@ export default async function ClusterPage({
   const scores = (cluster.synthScores ?? {}) as Record<string, number | null>;
   const memberIds = new Set(cluster.ideas.map((i) => i.id));
   const available = pickable.filter((i) => !memberIds.has(i.id));
+  const [canvasDoc, prdDoc] = synthesized
+    ? await Promise.all([
+        getClusterDoc(cluster.id, "CANVAS"),
+        getClusterDoc(cluster.id, "PRD"),
+      ])
+    : [null, null];
 
   return (
     <main className="mx-auto max-w-3xl px-6 py-10">
@@ -161,6 +170,33 @@ export default async function ClusterPage({
             </div>
           )}
 
+          {/* artifacts */}
+          <div className="mt-5 border-t border-neutral-200 pt-4 dark:border-neutral-800">
+            <p className="mb-2 text-xs font-medium uppercase tracking-wide text-neutral-400">
+              Artefatos (IA)
+            </p>
+            <div className="grid gap-2 sm:grid-cols-2">
+              <ArtifactRow
+                label="Canvas"
+                icon={LayoutGrid}
+                exists={!!canvasDoc}
+                clusterId={cluster.id}
+                href={`/sintese/${cluster.id}/canvas`}
+                action={generateClusterCanvasAction}
+                hasKey={hasKey}
+              />
+              <ArtifactRow
+                label="PRD"
+                icon={FileText}
+                exists={!!prdDoc}
+                clusterId={cluster.id}
+                href={`/sintese/${cluster.id}/prd`}
+                action={generateClusterPrdAction}
+                hasKey={hasKey}
+              />
+            </div>
+          </div>
+
           {/* actions */}
           <div className="mt-5 flex flex-wrap items-center gap-3 border-t border-neutral-200 pt-4 dark:border-neutral-800">
             {cluster.savedIdeaId ? (
@@ -210,5 +246,62 @@ export default async function ClusterPage({
         </SubmitButton>
       </form>
     </main>
+  );
+}
+
+function ArtifactRow({
+  label,
+  icon: Icon,
+  exists,
+  clusterId,
+  href,
+  action,
+  hasKey,
+}: {
+  label: string;
+  icon: LucideIcon;
+  exists: boolean;
+  clusterId: string;
+  href: string;
+  action: (formData: FormData) => Promise<void>;
+  hasKey: boolean;
+}) {
+  return (
+    <div className="flex items-center justify-between gap-3 rounded-lg border border-neutral-200 px-3 py-2 dark:border-neutral-800">
+      <span className="flex items-center gap-2 text-sm font-medium">
+        <Icon className="h-4 w-4 text-indigo-500" />
+        {label}
+      </span>
+      {exists ? (
+        <div className="flex items-center gap-3">
+          <Link
+            href={href}
+            className="text-sm text-indigo-600 underline-offset-4 hover:underline dark:text-indigo-400"
+          >
+            Ver
+          </Link>
+          <form action={action}>
+            <input type="hidden" name="clusterId" value={clusterId} />
+            <SubmitButton
+              pendingText="Gerando…"
+              className="text-xs text-neutral-400 underline-offset-4 hover:underline"
+            >
+              Regenerar
+            </SubmitButton>
+          </form>
+        </div>
+      ) : (
+        <form action={action}>
+          <input type="hidden" name="clusterId" value={clusterId} />
+          <SubmitButton
+            disabled={!hasKey}
+            pendingText="Gerando…"
+            className="rounded-md bg-indigo-600 px-3 py-1.5 text-xs font-medium text-white transition-colors hover:bg-indigo-500"
+          >
+            Gerar
+          </SubmitButton>
+        </form>
+      )}
+    </div>
   );
 }

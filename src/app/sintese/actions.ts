@@ -11,6 +11,7 @@ import {
   removeIdeaFromCluster,
   deleteCluster,
 } from "@/lib/synthesis";
+import { generateClusterCanvas, generateClusterPRD } from "@/lib/generate";
 
 export type ClusterState =
   | { ok: true; clusters: number; analyzed: number }
@@ -87,4 +88,21 @@ export async function deleteClusterAction(formData: FormData) {
   await deleteCluster(id);
   revalidatePath("/sintese");
   redirect("/sintese");
+}
+
+// ---- artifacts (Canvas / PRD from the synthesis) --------------------------
+export async function generateClusterCanvasAction(formData: FormData) {
+  const id = String(formData.get("clusterId"));
+  if (!id) return;
+  await generateClusterCanvas(id);
+  revalidatePath(`/sintese/${id}`);
+  revalidatePath(`/sintese/${id}/canvas`);
+}
+
+export async function generateClusterPrdAction(formData: FormData) {
+  const id = String(formData.get("clusterId"));
+  if (!id) return;
+  await generateClusterPRD(id);
+  revalidatePath(`/sintese/${id}`);
+  revalidatePath(`/sintese/${id}/prd`);
 }

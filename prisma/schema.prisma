@@ -105,6 +105,7 @@ model IdeaCluster {
   synthScores       Json?
   synthesizedAt     DateTime?
   savedIdeaId       String? // the Idea created from this synthesis, if any
+  docs              GeneratedDoc[]
   createdAt         DateTime  @default(now())
 }
 
@@ -246,16 +247,19 @@ model ProjectFit {
 // Modules 8 & 9: AI-generated artifacts per idea.
 // CANVAS content is JSON (9 BMC blocks); PRD content is markdown.
 model GeneratedDoc {
-  id        String   @id @default(cuid())
-  ideaId    String
-  idea      Idea     @relation(fields: [ideaId], references: [id], onDelete: Cascade)
-  type      String // CANVAS | PRD
+  id        String       @id @default(cuid())
+  ideaId    String?
+  idea      Idea?        @relation(fields: [ideaId], references: [id], onDelete: Cascade)
+  clusterId String?
+  cluster   IdeaCluster? @relation(fields: [clusterId], references: [id], onDelete: Cascade)
+  type      String // CANVAS | PRD | SDD
   content   String
   model     String
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  createdAt DateTime     @default(now())
+  updatedAt DateTime     @updatedAt
 
   @@unique([ideaId, type])
+  @@unique([clusterId, type])
 }
 
 // Module 11: gamification. Event-sourced XP — each milestone is granted once

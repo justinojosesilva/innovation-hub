@@ -96,35 +96,27 @@ const CANVAS_SCHEMA = {
   additionalProperties: false,
 } as const;
 
-export async function generateCanvas(ideaId: string) {
-  const GEN_MODEL = await getGenModel();
-  const idea = await fetchIdea(ideaId);
+// Core generation (no persistence) — works off any IdeaForGen-shaped subject,
+// so it serves both real ideas and synthesized clusters.
+async function buildCanvasBlocks(subject: IdeaForGen): Promise<{ blocks: CanvasBlocks; model: string }> {
+  const model = await getGenModel();
   const msg = await client().messages.create({
-    model: GEN_MODEL,
+    model,
     max_tokens: 4000,
     system:
       "Você é estrategista de produto. Gere um Business Model Canvas conciso e acionável em português para a ideia descrita. Cada bloco deve ter de 2 a 5 itens objetivos (frases curtas), específicos para esta ideia — nada genérico.",
-    messages: [{ role: "user", content: ideaContext(idea) }],
+    messages: [{ role: "user", content: ideaContext(subject) }],
     output_config: { format: { type: "json_schema", schema: CANVAS_SCHEMA } },
   });
-
   const text = msg.content.find((b) => b.type === "text");
   if (!text || text.type !== "text") throw new Error("Resposta vazia");
-  const blocks = JSON.parse(text.text) as CanvasBlocks;
-
-  await prisma.generatedDoc.upsert({
-    where: { ideaId_type: { ideaId, type: "CANVAS" } },
-    update: { content: JSON.stringify(blocks), model: GEN_MODEL },
-    create: { ideaId, type: "CANVAS", content: JSON.stringify(blocks), model: GEN_MODEL },
-  });
-  return blocks;
+  return { blocks: JSON.parse(text.text) as CanvasBlocks, model };
 }
 
-export async function generatePRD(ideaId: string) {
-  const GEN_MODEL = await getGenModel();
-  const idea = await fetchIdea(ideaId);
+async function buildPRDMarkdown(subject: IdeaForGen): Promise<{ markdown: string; model: string }> {
+  const model = await getGenModel();
   const stream = client().messages.stream({
-    model: GEN_MODEL,
+    model,
     max_tokens: 12000,
     system: `Você é Product Manager sênior. Escreva um PRD (Product Requirements Document) claro e acionável em português (markdown) para a ideia descrita.
 
@@ -141,20 +133,82 @@ Estruture com estas seções (use ## para títulos):
 ## Riscos & Mitigações
 
 Seja específico para esta ideia. Responda APENAS com o documento em markdown, sem preâmbulo nem comentários finais.`,
-    messages: [{ role: "user", content: ideaContext(idea) }],
+    messages: [{ role: "user", content: ideaContext(subject) }],
   });
-
   const msg = await stream.finalMessage();
   const text = msg.content.find((b) => b.type === "text");
   const markdown = text && text.type === "text" ? text.text : "";
   if (!markdown) throw new Error("Resposta vazia");
+  return { markdown, model };
+}
 
+export async function generateCanvas(ideaId: string) {
+  const { blocks, model } = await buildCanvasBlocks(await fetchIdea(ideaId));
+  await prisma.generatedDoc.upsert({
+    where: { ideaId_type: { ideaId, type: "CANVAS" } },
+    update: { content: JSON.stringify(blocks), model },
+    create: { ideaId, type: "CANVAS", content: JSON.stringify(blocks), model },
+  });
+  return blocks;
+}
+
+export async function generatePRD(ideaId: string) {
+  const { markdown, model } = await buildPRDMarkdown(await fetchIdea(ideaId));
   await prisma.generatedDoc.upsert({
     where: { ideaId_type: { ideaId, type: "PRD" } },
-    update: { content: markdown, model: GEN_MODEL },
-    create: { ideaId, type: "PRD", content: markdown, model: GEN_MODEL },
+    update: { content: markdown, model },
+    create: { ideaId, type: "PRD", content: markdown, model },
   });
   return markdown;
+}
+
+// ---- Cluster (Sínteses) variants: generate Canvas/PRD for a synthesized concept.
+async function clusterToSubject(clusterId: string): Promise<IdeaForGen> {
+  const c = await prisma.ideaCluster.findUnique({ where: { id: clusterId } });
+  if (!c || !c.synthName) throw new Error("Sintetize o grupo antes de gerar artefatos.");
+  const features = c.synthFeatures.length
+    ? `\n\nFuncionalidades:\n- ${c.synthFeatures.join("\n- ")}`
+    : "";
+  return {
+    id: c.id,
+    title: c.synthName,
+    category: c.theme,
+    description: (c.synthValueProp ?? "") + features,
+    whyItMatters: c.synthDifferential,
+    howToImplement: null,
+    monetization: null,
+    problem: null,
+    solution: null,
+    audience: null,
+    mvp: c.synthMvp,
+    stack: null,
+  };
+}
+
+export async function generateClusterCanvas(clusterId: string) {
+  const { blocks, model } = await buildCanvasBlocks(await clusterToSubject(clusterId));
+  await prisma.generatedDoc.upsert({
+    where: { clusterId_type: { clusterId, type: "CANVAS" } },
+    update: { content: JSON.stringify(blocks), model },
+    create: { clusterId, type: "CANVAS", content: JSON.stringify(blocks), model },
+  });
+  return blocks;
+}
+
+export async function generateClusterPRD(clusterId: string) {
+  const { markdown, model } = await buildPRDMarkdown(await clusterToSubject(clusterId));
+  await prisma.generatedDoc.upsert({
+    where: { clusterId_type: { clusterId, type: "PRD" } },
+    update: { content: markdown, model },
+    create: { clusterId, type: "PRD", content: markdown, model },
+  });
+  return markdown;
+}
+
+export async function getClusterDoc(clusterId: string, type: "CANVAS" | "PRD") {
+  return prisma.generatedDoc.findUnique({
+    where: { clusterId_type: { clusterId, type } },
+  });
 }
 
 export async function generateSDD(ideaId: string) {
