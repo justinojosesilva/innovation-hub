@@ -32,10 +32,19 @@ export function AnalyzeForm({ hasKey, hasPairs }: { hasKey: boolean; hasPairs: b
         </p>
       )}
       {state?.ok && (
-        <p className="mt-2 flex items-center gap-2 rounded-lg bg-emerald-50 px-3 py-2 text-sm text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300">
-          <CheckCircle2 className="h-4 w-4 shrink-0" />
-          {state.pairsFound} par{state.pairsFound === 1 ? "" : "es"} em {state.analyzed} ideias.
-        </p>
+        <div className="mt-2 space-y-2">
+          <p className="flex items-center gap-2 rounded-lg bg-emerald-50 px-3 py-2 text-sm text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300">
+            <CheckCircle2 className="h-4 w-4 shrink-0" />
+            {state.pairsFound} par{state.pairsFound === 1 ? "" : "es"} em {state.analyzed} ideias
+            {state.batches > 1 ? ` · ${state.batches} lotes` : ""}.
+          </p>
+          {state.skipped > 0 && (
+            <p className="flex items-center gap-2 rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-700 dark:bg-amber-950/40 dark:text-amber-300">
+              <AlertCircle className="h-4 w-4 shrink-0" />
+              {state.skipped} lote{state.skipped === 1 ? "" : "s"} truncou e foi pulado — reanalise para cobri-lo.
+            </p>
+          )}
+        </div>
       )}
       {state && !state.ok && (
         <p className="mt-2 flex items-center gap-2 rounded-lg bg-rose-50 px-3 py-2 text-sm text-rose-700 dark:bg-rose-950/40 dark:text-rose-300">

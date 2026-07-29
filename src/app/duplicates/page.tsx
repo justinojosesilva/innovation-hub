@@ -4,6 +4,8 @@ import { mergePair, dismissPair } from "./actions";
 import { AnalyzeForm } from "./analyze-form";
 
 export const dynamic = "force-dynamic";
+// Batched dedup runs several LLM calls in sequence — give the function room.
+export const maxDuration = 300;
 
 const REC_STYLE: Record<string, string> = {
   MERGE: "bg-rose-100 text-rose-700 dark:bg-rose-950 dark:text-rose-300",

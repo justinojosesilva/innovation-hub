@@ -11,7 +11,7 @@ function refresh() {
 }
 
 export type AnalyzeState =
-  | { ok: true; pairsFound: number; analyzed: number }
+  | { ok: true; pairsFound: number; analyzed: number; batches: number; skipped: number }
   | { ok: false; error: string }
   | null;
 
@@ -22,7 +22,13 @@ export async function runAnalysis(
   try {
     const r = await analyzeDuplicates();
     refresh();
-    return { ok: true, pairsFound: r.pairsFound, analyzed: r.analyzed };
+    return {
+      ok: true,
+      pairsFound: r.pairsFound,
+      analyzed: r.analyzed,
+      batches: r.batches,
+      skipped: r.skipped,
+    };
   } catch (e) {
     return { ok: false, error: e instanceof Error ? e.message : "Falha ao analisar" };
   }
