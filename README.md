@@ -16,6 +16,10 @@ ideias acumuladas: **“qual delas vale o meu tempo?”**
 [![Tailwind CSS](https://img.shields.io/badge/Tailwind-4-06B6D4?logo=tailwindcss&logoColor=white)](https://tailwindcss.com)
 [![Claude](https://img.shields.io/badge/AI-Claude-D97757?logo=anthropic&logoColor=white)](https://www.anthropic.com)
 
+<br/>
+
+<img src="docs/dashboard.png" alt="Dashboard do Innovation Hub" width="900" />
+
 </div>
 
 ---
@@ -46,6 +50,41 @@ acompanha as que viraram projeto — tudo em um só lugar.
 | 🎯 **Aplicabilidade** | Avalia (via IA) quais ideias servem como _feature_ de um projeto existente, ranqueadas por ROI. |
 | 🏅 **Gamificação** | XP event-sourced, níveis e conquistas por marcos (catalogar, validar, MVP, produção, features, marcos). |
 | ⚙️ **Configurável** | Seletor do modelo de IA (Opus / Sonnet / Haiku) em runtime. |
+
+## 📸 Screenshots
+
+<table>
+  <tr>
+    <td width="50%" valign="top">
+      <img src="docs/ranking.png" alt="Ranking com sliders de peso" /><br/>
+      <sub><b>Ranking</b> — score ponderado com sliders que re-rankeiam ao vivo.</sub>
+    </td>
+    <td width="50%" valign="top">
+      <img src="docs/detalhe_ideia.png" alt="Detalhe da ideia" /><br/>
+      <sub><b>Detalhe da ideia</b> — funil de status, maturação e score por critério.</sub>
+    </td>
+  </tr>
+  <tr>
+    <td width="50%" valign="top">
+      <img src="docs/sinteses.png" alt="Sínteses" /><br/>
+      <sub><b>Sínteses</b> — ideias agrupadas por tema, prontas para virar um sistema.</sub>
+    </td>
+    <td width="50%" valign="top">
+      <img src="docs/radar.png" alt="Radar de tendências" /><br/>
+      <sub><b>Radar</b> — temas por volume, frequência nos relatórios e score médio.</sub>
+    </td>
+  </tr>
+  <tr>
+    <td width="50%" valign="top">
+      <img src="docs/conquistas.png" alt="Conquistas" /><br/>
+      <sub><b>Conquistas</b> — XP, níveis e conquistas por marcos do pipeline.</sub>
+    </td>
+    <td width="50%" valign="top">
+      <img src="docs/projetos.png" alt="Projetos" /><br/>
+      <sub><b>Projetos</b> — portfólio com estado, progresso e saúde de cada projeto.</sub>
+    </td>
+  </tr>
+</table>
 
 ## 🏗️ Arquitetura
 
